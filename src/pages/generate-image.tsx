@@ -1,16 +1,44 @@
 import React, { useState } from "react";
-import { Input } from "../components/common/input";
 import { Button } from "../components/common/button";
-import { RadioGroup, RadioGroupItem } from "../components/common/radio-group";
-import { Label } from "../components/common/label";
 import { api } from "../utils/api";
 import Image from "next/image";
+import { Textarea } from "../components/common/text-area";
+import { cn } from "../lib/utils";
+
+type PromptOption = { name: string; prompt: string; image: string };
+type PromptOptions = {
+  style: readonly PromptOption[];
+};
+
+const promptOptions: PromptOptions = {
+  style: [
+    {
+      name: "realistic",
+      prompt: "realistic style",
+      image: "/style-preview/realistic.png",
+    },
+    {
+      name: "minimalistic",
+      prompt: "minimalistic",
+      image: "/style-preview/minimalistic.png",
+    },
+    {
+      name: "comic",
+      prompt: "comic",
+      image: "/style-preview/comic.png",
+    },
+    {
+      name: "single stroke",
+      prompt: "in single stroke style",
+      image: "/style-preview/comic.png",
+    },
+  ] as const,
+};
 
 const GenerateImage = () => {
   const [form, setForm] = useState({
     prompt: "",
-    style: "",
-    type: "",
+    style: promptOptions.style[0],
   });
   const [resultImageUrl, setResultImageUrl] = useState("");
 
@@ -20,21 +48,14 @@ const GenerateImage = () => {
     },
   });
 
-  const handleStyleChange = (style: string) => {
+  const handleStyleChange = (style: PromptOption) => {
     setForm((prev) => ({
       ...prev,
       style,
     }));
   };
 
-  const handleTypeChange = (type: string) => {
-    setForm((prev) => ({
-      ...prev,
-      type,
-    }));
-  };
-
-  const handlePromptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setForm((prev) => ({
       ...prev,
       prompt: e.target.value,
@@ -42,66 +63,61 @@ const GenerateImage = () => {
   };
 
   const handleGenerateImage = () => {
-    generateImage.mutate({
-      ...form,
-    });
+    if (form.prompt && form.style) {
+      generateImage.mutate({
+        prompt: form.prompt,
+        style: form.style.prompt,
+      });
+    }
   };
 
   return (
-    <div className="flex flex-col p-4">
+    <div className="mx-auto flex max-w-screen-lg flex-col p-4">
+      <div className="pb-8">
+        <h1 className="text-center text-6xl">GENERATE TATTOO</h1>
+      </div>
       <div className="flex ">
-        <Input
+        <Textarea
           onChange={handlePromptChange}
-          placeholder="czarny kot grający na gitarze, kot siedzi na globusie"
+          placeholder="pirate cat riding a scooter"
+          className="text-lg"
         />
       </div>
       <div className="mt-4">
-        <p className="mb-2 text-lg">Wybierz styl projektu</p>
-        <RadioGroup
-          onValueChange={handleStyleChange}
-          defaultValue="comfortable"
-        >
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="default" id="r1" />
-            <Label htmlFor="r1">Kontury</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="comfortable" id="r2" />
-            <Label htmlFor="r2">Rysunek</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="compact" id="r3" />
-            <Label htmlFor="r3">Cyfrowy</Label>
-          </div>
-        </RadioGroup>
+        <p className="my-4 text-xl font-bold">Select style</p>
+        <div className="flex gap-4">
+          {promptOptions.style.map((style) => (
+            <button
+              onClick={() => handleStyleChange(style)}
+              key={style.name}
+              className={cn(
+                "relative aspect-square w-60 rounded-sm transition-all",
+                form.style === style && "scale-[103%] ring-4 ring-secondary-300"
+              )}
+            >
+              <Image src={style.image} className="rounded-sm" alt="" fill />
+              <p className="absolute top-0 z-10 rounded-br-md bg-primary-950 p-2">
+                {style.name}
+              </p>
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="mt-4">
-        <p className="mb-2 text-lg">Wybierz typ projektu</p>
-        <RadioGroup onValueChange={handleTypeChange} defaultValue="comfortable">
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="default" id="r1" />
-            <Label htmlFor="r1">Minimalistyczny</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="comfortable" id="r2" />
-            <Label htmlFor="r2">Realistyczny</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="compact" id="r3" />
-            <Label htmlFor="r3">Komiczny</Label>
-          </div>
-        </RadioGroup>
-      </div>
+
       <Button
         onClick={handleGenerateImage}
         disabled={generateImage.isLoading}
-        className="mt-8 w-fit"
+        className="mx-auto mt-8 w-full max-w-sm text-xl font-bold"
+        size="lg"
       >
         Generuj
       </Button>
-      {generateImage.isSuccess && (
-        <div className="relative aspect-square w-96">
-          <Image src={resultImageUrl} alt="generated image" fill />
+      {resultImageUrl && (
+        <div>
+          <h3>result</h3>
+          <div className="relative mt-4 aspect-square w-96">
+            <Image src={resultImageUrl} alt="generated image" fill />
+          </div>
         </div>
       )}
     </div>

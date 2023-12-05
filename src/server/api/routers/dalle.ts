@@ -1,24 +1,21 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { Configuration, OpenAIApi } from "openai";
+import OpenAI from "openai";
 import { env } from "../../../env.mjs";
 import { BUCKET_NAME, s3 } from "../../s3";
 import type { Image } from "@prisma/client";
 
-const configuration = new Configuration({
-  apiKey: env.OPENAI_SECRET,
-});
-
-const openai = new OpenAIApi(configuration);
+const openai = new OpenAI({ apiKey: env.OPENAI_SECRET });
 
 const generateIcon = async (prompt: string) => {
-  const res = await openai.createImage({
+  const res = await openai.images.generate({
+    model: "dall-e-3",
     prompt,
     n: 1,
-    size: "512x512",
+    size: "1024x1024",
     response_format: "b64_json",
   });
-  return res.data.data.map((result) => result.b64_json || "");
+  return res.data[0]?.b64_json;
 };
 
 export const dalleRouter = createTRPCRouter({
@@ -27,38 +24,34 @@ export const dalleRouter = createTRPCRouter({
       z.object({
         prompt: z.string(),
         style: z.string(),
-        type: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const finalPrompt = `a ${input.prompt}, ${input.style}, ${input.type}, grayscale, white background, art, high quality`;
+      const finalPrompt = `Create a tattoo sketch of a ${input.prompt}, ${input.style}, tattoo should have simple shadows, I want the drawing to be black and white, done on a white background, in a graphic style. The details of the tattoo should be clear and precise, perfect for use as a tattoo pattern.`;
+      console.log(finalPrompt);
 
-      const base64EncodedImages = await generateIcon(finalPrompt);
-      console.log(base64EncodedImages);
+      const b64Image = await generateIcon(finalPrompt);
 
-      const createdImage = await Promise.all(
-        base64EncodedImages.map(async (base64image) => {
-          const image: Image = await ctx.prisma.image.create({
-            data: {
-              userId: ctx.session.user.id,
-              isPublic: false,
-            },
-          });
-          await s3
-            .putObject({
-              Bucket: BUCKET_NAME,
-              Body: Buffer.from(base64image, "base64"),
-              Key: image.id,
-              ContentEncoding: "base64",
-              ContentType: "image/png",
-            })
-            .promise();
-          return image;
-        })
-      );
+      if (b64Image) {
+        const image: Image = await ctx.prisma.image.create({
+          data: {
+            userId: ctx.session.user.id,
+            isPublic: false,
+          },
+        });
+        console.log(image);
 
-      if (createdImage[0]) {
-        return `https://${BUCKET_NAME}.s3.amazonaws.com/${createdImage[0].id}`;
+        await s3
+          .putObject({
+            Bucket: BUCKET_NAME,
+            Body: Buffer.from(b64Image, "base64"),
+            Key: image.id,
+            ContentEncoding: "base64",
+            ContentType: "image/png",
+          })
+          .promise();
+        console.log(`https://${BUCKET_NAME}.s3.amazonaws.com/${image.id}`);
+        return `https://${BUCKET_NAME}.s3.amazonaws.com/${image.id}`;
       }
     }),
 });

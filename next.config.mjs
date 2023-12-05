@@ -18,5 +18,8 @@ const config = {
     locales: ["en"],
     defaultLocale: "en",
   },
+  images: {
+    domains: ["tattooit.s3.amazonaws.com", "cdn.discordapp.com"],
+  },
 };
 export default config;
